@@ -1,0 +1,128 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "srvcs-sequenceratio",
+    "description": "",
+    "license": {
+      "name": "Apache-2.0",
+      "identifier": "Apache-2.0"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "tags": [],
+        "summary": "`GET /` — service identity (srvcs service standard).",
+        "operationId": "index",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Info"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [],
+        "summary": "`POST /` — the ratios between consecutive terms of a sequence.",
+        "description": "This service does no arithmetic of its own. For each consecutive pair it\nasks `srvcs-floatdivide` for `values[i+1] / values[i]` and collects the\n`f64` results. A list with fewer than two elements yields `[]` and makes no\ndependency calls. If `floatdivide` rejects a pair (e.g. a zero divisor) the\n`422` is forwarded; if it is unreachable this service reports itself\ndegraded rather than guessing.",
+        "operationId": "evaluate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RatioResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "a pair has a zero divisor or a non-number (forwarded from srvcs-floatdivide)"
+          },
+          "500": {
+            "description": "srvcs-floatdivide returned an unusable response, or the sequence is too long"
+          },
+          "503": {
+            "description": "the srvcs-floatdivide dependency is unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EvalRequest": {
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "properties": {
+          "values": {
+            "type": "object",
+            "description": "The sequence of numbers. The ratios between each consecutive pair are\nreturned; a list with fewer than two elements yields an empty result."
+          }
+        }
+      },
+      "Info": {
+        "type": "object",
+        "required": [
+          "service",
+          "concern",
+          "depends_on"
+        ],
+        "properties": {
+          "concern": {
+            "type": "string"
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "service": {
+            "type": "string"
+          }
+        }
+      },
+      "RatioResponse": {
+        "type": "object",
+        "required": [
+          "values",
+          "result"
+        ],
+        "properties": {
+          "result": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            },
+            "description": "One `f64` ratio per consecutive pair: `result[i] = values[i+1] / values[i]`."
+          },
+          "values": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}
