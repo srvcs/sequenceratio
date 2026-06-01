@@ -1,62 +1,65 @@
 # srvcs-sequenceratio
 
-The sequence-ratio service of the srvcs.cloud distributed standard library.
+## Name
 
-Its single concern: **the ratios between consecutive terms of a sequence.** It
-does no arithmetic of its own. For each consecutive pair it asks
-[`srvcs-floatdivide`](https://github.com/srvcs/floatdivide) for the quotient:
+| Field | Value |
+| --- | --- |
+| Service | `srvcs-sequenceratio` |
+| Slug | `sequenceratio` |
+| Repository | `srvcs/sequenceratio` |
+| Package | `srvcs-sequenceratio` |
+| Kind | `orchestrator` |
 
-```text
-result = []
-for i in 0 .. len(values) - 1:
-    result[i] = floatdivide(values[i + 1], values[i])   # one HTTP call per pair
-```
+## Function
 
-A sequence with **fewer than two elements** yields `[]`, and makes no dependency
-calls at all. Each ratio in `result` is an `f64`.
+sequences: ratios between consecutive terms
 
-```text
-sequenceratio([2, 4, 8]) == [2.0, 2.0]
-```
+## Dependencies
+
+| Dependency | Repository |
+| --- | --- |
+| `srvcs-floatdivide` | [srvcs/floatdivide](https://github.com/srvcs/floatdivide) |
 
 ## API
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/` | Service identity, concern, and dependency list |
-| `POST` | `/` | Ratios between consecutive terms of `values` |
-| `GET` | `/healthz` `/readyz` `/metrics` `/openapi.json` | srvcs service standard surface |
+| `GET` | `/` | Service identity |
+| `POST` | `/` | Evaluate the service function |
+| `GET` | `/healthz` | Liveness probe |
+| `GET` | `/readyz` | Readiness probe |
+| `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/openapi.json` | OpenAPI document |
 
-```sh
-curl -s -X POST localhost:8080/ -H 'content-type: application/json' -d '{"values": [2, 4, 8]}'
-# {"values":[2,4,8],"result":[2.0,2.0]}
-```
+## Inputs
 
-Responses:
+| Name | Type | Required |
+| --- | --- | --- |
+| `values` | `json[]` | yes |
 
-- `200 {"values": [...], "result": [...]}` — evaluated; `result` is an array of `f64`.
-- `422` — a pair has a zero divisor or a non-number, forwarded from `srvcs-floatdivide`.
-- `500` — `srvcs-floatdivide` returned an unusable response, or the sequence is too long.
-- `503` — the `srvcs-floatdivide` dependency is unavailable.
+## Outputs
 
-## Dependencies
-
-- [`srvcs-floatdivide`](https://github.com/srvcs/floatdivide)
-
-A single request fans out across the dependency graph: one
-`sequenceratio → floatdivide` call per consecutive pair, and each `floatdivide`
-in turn validates its operands.
+| Name | Type |
+| --- | --- |
+| `values` | `json[]` |
+| `result` | `number[]` |
 
 ## Configuration
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `SRVCS_BIND_ADDR` | `0.0.0.0:8080` | Bind address |
-| `SRVCS_FLOATDIVIDE_URL` | `http://127.0.0.1:8081` | Base URL of `srvcs-floatdivide` |
 | `SRVCS_ENV` | `development` | Environment label for logs |
 | `RUST_LOG` | `info,tower_http=info` | Tracing filter |
+| `SRVCS_FLOATDIVIDE_URL` | `http://127.0.0.1:8081` | Base URL for srvcs-floatdivide |
 
-## Local checks
+## Error Behavior
+
+- `422` means the request could not be evaluated for the documented input shape.
+- `503` means a required dependency was unavailable or returned an unexpected response.
+- Dependency validation errors are forwarded when this service delegates validation.
+
+## Local Checks
 
 ```sh
 cargo fmt --check
@@ -64,10 +67,8 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-Orchestration tests stand up a mock `srvcs-floatdivide` in-process that
-**actually computes** `a / b` from the request body, so the per-pair loop is
-genuinely exercised (e.g. `sequenceratio([2, 4, 8]) == [2.0, 2.0]`). See
-[`srvcs/platform`](https://github.com/srvcs/platform) for the shared standard.
+See the [srvcs service standard](https://github.com/srvcs/platform/blob/main/STANDARD.md) for the full operational contract.
 
-> Note: the `cargoHash` in `flake.nix` is inherited from the template and must be
-> refreshed with a `nix build` before the Nix gates pass.
+## Metadata
+
+Machine-readable service metadata lives in `srvcs.yaml`. Keep it aligned with this README when the service contract changes.
